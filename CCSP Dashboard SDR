@@ -1,0 +1,93 @@
+Project: Internal Monitoring and Analytics Dashboard
+
+
+Purpose: Requirements for a Reusable Visualization Dashboard
+
+Overview
+
+I need a standalone JavaScript-based dashboard that visualizes real-time data from a remote PostgreSQL database hosting our web application’s e-application and user activity data. The dashboard will be a visualization-only tool, built with Vue.js and styled with Tailwind CSS. The source code will be hosted on Git for others to use and adapt, requiring a configurable setup and a .gitignore file.
+
+Functional Requirements
+
+1. Application Metrics
+Total Applications Received: Cumulative count of all applications submitted.
+Breakdown by Application Type: Counts for each of the 10+ application types (e.g., Type A, Type B).
+Breakdown by Application Status: Counts for statuses (e.g., Submitted, In Progress, Completed, Rejected).
+Average Processing Time per Application Type: Average time from submission to completion per type (in days or hours).
+Submission Trends Over Time: Daily or weekly submission counts as a line graph.
+Pending Application Age: Counts of applications in "Submitted" or "In Progress" for >7 days, >14 days, etc.
+Time Filters: Filter by date ranges (e.g., last 7 days, last 30 days, all time).
+
+2. User Activity Metrics
+Daily Active Users (DAU): Unique users interacting daily.
+Monthly Active Users (MAU): Unique users over a 30-day period.
+Total Accumulated Registrations: Cumulative registered users since launch.
+Trend Visualizations: Line graphs for DAU (past 30 days) and MAU (monthly since launch).
+
+3. Visualization and Usability
+Interactive Charts:
+Bar charts for type and status breakdowns (clickable for drill-down to detailed tables).
+Pie charts for status distribution.
+Line graphs for trends (zoomable with toggle between line/area styles).
+Color-coded data (e.g., green for "Completed", red for "Rejected") with a legend.
+Real-Time Updates: Refresh data on-demand via a “Reload” button.
+Export Functionality: Export data as CSV or PDF.
+Simple Interface: Clean, Tailwind-styled layout with clear labels and tooltips on hover for chart details.
+Search and Filters:
+Dropdown for filtering by application type.
+Checkboxes for filtering by status.
+Search bar for application ID or text fields (if available in schema).
+Summary Cards: Small cards displaying key metrics (e.g., Total Applications, DAU, Avg. Processing Time).
+Loading and Error States:
+Show a Tailwind-styled spinner during data fetch.
+Display error alerts (e.g., “Database connection failed”) if queries fail.
+Responsive Design:
+Stack charts and filters vertically on mobile (Tailwind md: breakpoints).
+Collapsible sections for Application and User Metrics.
+Custom Date Picker: Replace basic time filters with a Vue-compatible date range picker.
+Theme Toggle: Light/dark mode switch using Tailwind’s dark: classes.
+
+Technical Requirements
+
+Framework:
+Vue.js for the frontend visualization (with a charting library like Chart.js or Vue-specific alternatives).
+Node.js for a local server script to query the PostgreSQL database.
+
+Styling: Use Tailwind CSS for responsive, modern design.
+
+Data Source:
+Query a remote PostgreSQL database using the pg library in Node.js.
+Assume tables like:
+applications (id, type, status, submission_date, completion_date).
+users (id, registration_date, last_active).
+Vue fetches data from the Node.js script via http://localhost:3000/data.
+
+Configuration:
+Store database credentials in a .env file, excluded via .gitignore.
+Use dotenv in Node.js to load these variables.
+No Data Storage: Visualization-only; no local persistence.
+No Login: For personal use; no authentication.
+Architecture: Node.js server for queries, Vue.js frontend for display.
+Performance: Optimize rendering and queries for efficiency.
+Deployment: Standalone JS app runnable locally (node server.js and npm run serve).
+Git Hosting: Include .gitignore and clear instructions for configuration.
+
+Deliverables
+
+Source Code:
+Vue.js app with Tailwind CSS and enhanced frontend features.
+Node.js script for PostgreSQL queries.
+.env.example file with placeholder credentials.
+.gitignore file.
+
+Setup Instructions:
+Install dependencies (npm install).
+Configure .env with PostgreSQL credentials.
+Run the app (Node server, then Vue app).
+README.md: Detailed guide for setup, configuration, and usage.
+
+Assumptions
+
+The PostgreSQL database runs on a known remote host, accessible with user-provided credentials.
+Users will configure their own .env files.
+The schema supports all metrics (additional fields like applicant_name may enable search if included).

@@ -1,0 +1,67 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: ccsp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-ccsp_dashboard}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - ccsp-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ccsp-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      PORT: 3000
+      USE_MOCK_DATA: ${USE_MOCK_DATA:-false}
+      DB_USER: ${DB_USER:-postgres}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-ccsp_dashboard}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_PORT: 5432
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    networks:
+      - ccsp-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Frontend Dashboard
+  frontend:
+    build:
+      context: ./frontend/ccsp-vue-dashboard
+      dockerfile: Dockerfile
+    container_name: ccsp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://backend:3000
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - ccsp-network
+
+networks:
+  ccsp-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
