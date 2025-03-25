@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen flex flex-col" :class="{ dark: isDarkMode }">
     <header
-      class="bg-white dark:bg-gray-800 shadow-md py-4 px-6 flex items-center justify-between"
+      class="bg-white dark:bg-gray-900 shadow-md py-4 px-6 flex items-center justify-between"
     >
       <div class="flex items-center">
         <h1 class="text-xl font-bold text-blue-600 dark:text-blue-400">
@@ -68,44 +68,44 @@
 
     <div class="flex flex-1 overflow-hidden">
       <aside
-        class="w-64 bg-white dark:bg-gray-800 shadow-md p-4 hidden md:block"
+        class="w-64 bg-white dark:bg-gray-900 shadow-md p-4 hidden md:block"
       >
         <nav>
           <ul class="space-y-2">
             <li>
               <RouterLink
                 to="/"
-                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
+                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800 text-gray-700 dark:text-gray-200"
                 :class="{
-                  'bg-blue-100 dark:bg-blue-900 font-medium':
+                  'bg-blue-100 dark:bg-blue-800 font-medium':
                     $route.path === '/',
                 }"
               >
-                儀表板
+                概括
               </RouterLink>
             </li>
             <li>
               <RouterLink
                 to="/forms"
-                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
+                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800 text-gray-700 dark:text-gray-200"
                 :class="{
-                  'bg-blue-100 dark:bg-blue-900 font-medium':
+                  'bg-blue-100 dark:bg-blue-800 font-medium':
                     $route.path === '/forms',
                 }"
               >
-                申請表格
+                各項申請
               </RouterLink>
             </li>
             <li>
               <RouterLink
                 to="/users"
-                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-700 dark:text-gray-200"
+                class="block px-4 py-2 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800 text-gray-700 dark:text-gray-200"
                 :class="{
-                  'bg-blue-100 dark:bg-blue-900 font-medium':
+                  'bg-blue-100 dark:bg-blue-800 font-medium':
                     $route.path === '/users',
                 }"
               >
-                用戶活動
+                用戶統計
               </RouterLink>
             </li>
           </ul>
@@ -120,19 +120,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { RouterLink, RouterView, useRoute } from "vue-router";
+import { ref, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import {
+  HomeIcon,
+  DocumentTextIcon,
+  UserGroupIcon,
+  ArrowPathIcon,
+} from "@heroicons/vue/24/outline";
 
-const isDarkMode = ref(localStorage.getItem("darkMode") === "true");
+const router = useRouter();
 const route = useRoute();
+const isDarkMode = ref(false);
 
-function toggleDarkMode() {
+const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value;
-  localStorage.setItem("darkMode", isDarkMode.value.toString());
-}
+  document.documentElement.classList.toggle("dark");
+  localStorage.setItem("darkMode", isDarkMode.value ? "true" : "false");
+};
 
-function refreshData() {
-  // Emit a global event that components can listen to for refreshing data
-  window.dispatchEvent(new CustomEvent("refresh-dashboard-data"));
-}
+const refreshData = () => {
+  // Dispatch a custom event that all components can listen to
+  window.dispatchEvent(new Event("refresh-dashboard"));
+};
+
+onMounted(() => {
+  // Initialize dark mode from localStorage
+  const savedDarkMode = localStorage.getItem("darkMode");
+  if (savedDarkMode === "true") {
+    isDarkMode.value = true;
+    document.documentElement.classList.add("dark");
+  }
+});
 </script>
