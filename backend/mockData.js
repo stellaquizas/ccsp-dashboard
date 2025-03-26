@@ -1,15 +1,15 @@
 // Mock data for development
 const mockData = {
-  applications: {
-    metrics: generateApplicationsMockMetrics(),
-    trends: generateApplicationsMockTrends(),
-    list: generateApplicationsMockList(),
-    types: generateApplicationTypes(),
-    forms: generateFormsMockData(),
-  },
-  users: {
-    metrics: generateUserMockData(),
-  },
+  // applications: {
+  //   metrics: generateApplicationsMockMetrics(),
+  //   trends: generateApplicationsMockTrends(),
+  //   list: generateApplicationsMockList(),
+  //   types: generateApplicationTypes(),
+  //   forms: generateFormsMockData(),
+  // },
+  // users: {
+  //   metrics: generateUserMockData(),
+  // },
 };
 
 // User metrics mock data
