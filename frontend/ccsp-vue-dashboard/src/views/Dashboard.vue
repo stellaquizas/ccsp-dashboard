@@ -14,61 +14,66 @@
 
     <!-- Content -->
     <div v-else>
-      <!-- User Statistics -->
-      <div
-        class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 mb-6"
-      >
-        <div class="flex justify-between items-center mb-4">
+      <!-- User Registration Stats -->
+      <div class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 relative mb-6 rounded-lg shadow-sm p-6">
+        <div class="absolute top-2 right-2">
+          <MockDataIndicator :is-mock-data="MOCK_USER_REGISTRATION" />
+        </div>
+        <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
             用戶注冊總數
           </h2>
-          <div class="flex space-x-2">
-            <button
-              v-for="option in timeRangeOptions"
-              :key="option.value"
-              @click="selectedTimeRange = option.value"
-              class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
-              :class="{
-                'bg-blue-600 text-white': selectedTimeRange === option.value,
-                'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600':
-                  selectedTimeRange !== option.value,
-              }"
-            >
-              {{ option.label }}
-            </button>
+          <div class="flex items-center space-x-2">
+            <div class="flex space-x-2">
+              <button
+                v-for="option in timeRangeOptions"
+                :key="option.value"
+                @click="registrationTimeRange = option.value"
+                class="px-3 py-1 rounded-lg text-sm font-medium transition-colors"
+                :class="{
+                  'bg-blue-600 text-white': registrationTimeRange === option.value,
+                  'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600':
+                    registrationTimeRange !== option.value,
+                }"
+              >
+                {{ option.label }}
+              </button>
+            </div>
           </div>
         </div>
-        <div class="grid grid-cols-3 gap-4">
-          <div
-            v-for="(stat, index) in userStatsDisplay"
-            :key="index"
-            class="flex items-center space-x-3"
-          >
+        <div class="relative">
+          <div class="grid grid-cols-3 gap-8">
             <div
-              class="p-2 rounded-full"
-              :class="{
-                'bg-blue-100 dark:bg-blue-900': index === 0,
-                'bg-green-100 dark:bg-green-900': index === 1,
-                'bg-purple-100 dark:bg-purple-900': index === 2,
-              }"
+              v-for="(stat, index) in userRegistrationStats"
+              :key="index"
+              class="flex items-center space-x-4"
             >
-              <component
-                :is="stat.icon"
-                class="w-6 h-6"
+              <div
+                class="p-2 rounded-lg"
                 :class="{
-                  'text-blue-600 dark:text-blue-300': index === 0,
-                  'text-green-600 dark:text-green-300': index === 1,
-                  'text-purple-600 dark:text-purple-300': index === 2,
+                  'bg-blue-50 dark:bg-blue-900/20': index === 0,
+                  'bg-green-50 dark:bg-green-900/20': index === 1,
+                  'bg-purple-50 dark:bg-purple-900/20': index === 2,
                 }"
-              />
-            </div>
-            <div>
-              <p class="text-sm text-gray-600 dark:text-gray-300">
-                {{ stat.label }}
-              </p>
-              <p class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ stat.value }}
-              </p>
+              >
+                <component
+                  :is="stat.icon"
+                  class="w-6 h-6"
+                  :class="{
+                    'text-blue-600 dark:text-blue-400': index === 0,
+                    'text-green-600 dark:text-green-400': index === 1,
+                    'text-purple-600 dark:text-purple-400': index === 2,
+                  }"
+                />
+              </div>
+              <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ stat.label }}
+                </p>
+                <p class="text-xl font-semibold text-gray-900 dark:text-white">
+                  {{ stat.value }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -76,8 +81,11 @@
 
       <!-- Application Statistics -->
       <div
-        class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700 mb-6"
+        :class="[applicationStatsWidgetClass, 'relative rounded-lg shadow-sm p-6']"
       >
+        <div class="absolute top-2 right-2">
+          <MockDataIndicator :is-mock-data="MOCK_APPLICATION_OVERVIEW" />
+        </div>
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           申請統計
         </h2>
@@ -110,8 +118,11 @@
 
       <!-- Application Trend Chart -->
       <div
-        class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700"
+        :class="[applicationStatsWidgetClass, 'relative rounded-lg shadow-sm p-6']"
       >
+        <div class="absolute top-2 right-2">
+          <MockDataIndicator :is-mock-data="MOCK_APPLICATION_TRENDS" />
+        </div>
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
             申請趨勢
@@ -206,7 +217,7 @@
                   v-for="(trend, index) in filteredTrends"
                   :key="index"
                   class="absolute transition-all duration-300 group"
-                  :style="getChartStyle(trend, index)"
+                  :style="getChartStyle(trend.count, index, maxTrendCount)"
                 >
                   <div
                     class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 shadow-lg"
@@ -238,11 +249,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { apiService } from "../services/api-service";
+import { useRouter } from "vue-router";
+import MockDataIndicator from "@/components/MockDataIndicator.vue";
+import { apiService } from "@/services/api-service";
 import {
-  UserIcon,
-  PhoneIcon,
-  BuildingOfficeIcon,
+  UserCircleIcon,
+  DevicePhoneMobileIcon,
+  UsersIcon,
   DocumentTextIcon,
   ClockIcon,
   CheckCircleIcon,
@@ -251,6 +264,12 @@ import {
   ChartBarSquareIcon,
   ClipboardDocumentCheckIcon,
 } from "@heroicons/vue/24/outline";
+import type { CSSProperties } from 'vue';
+
+// Mock data flags
+const MOCK_USER_REGISTRATION = import.meta.env.VITE_MOCK_USER_REGISTRATION === "true";
+const MOCK_APPLICATION_OVERVIEW = import.meta.env.VITE_MOCK_APPLICATION_OVERVIEW === "true";
+const MOCK_APPLICATION_TRENDS = import.meta.env.VITE_MOCK_APPLICATION_TRENDS === "true";
 
 // Define interfaces
 interface UserStats {
@@ -276,12 +295,97 @@ interface ApplicationTrend {
   pending: number;
 }
 
+interface ApplicationMetrics {
+  overview: ApplicationStats;
+  typeBreakdown: Array<{ type: string; name: string; count: number }>;
+  statusBreakdown: Array<{ code: string; name: string; count: number }>;
+  avgProcessingTime: number;
+  maxProcessingTime: number;
+  pendingOverview: {
+    over_7_days: number;
+    over_14_days: number;
+  };
+  trends: Array<{
+    date: string;
+    total: number;
+    completed: number;
+    pending: number;
+  }>;
+}
+
+// Chart style types
+type ChartStyle = "bar" | "line";
+type ChartType = "total" | "completed" | "pending";
+
+interface BarStyle extends CSSProperties {
+  position: 'absolute';
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+  borderRadius: string;
+  backgroundColor: string;
+  transform: string;
+  transition: string;
+  boxShadow: string;
+  '&:hover'?: {
+    transform: string;
+    boxShadow: string;
+  };
+}
+
+interface PointStyle extends CSSProperties {
+  position: 'absolute';
+  bottom: string;
+  left: string;
+  width: string;
+  height: string;
+  borderRadius: string;
+  backgroundColor: string;
+  transform: string;
+  transition: string;
+  boxShadow: string;
+  '&:hover'?: {
+    transform: string;
+    boxShadow: string;
+  };
+}
+
+interface BarConfig {
+  width: number;
+  spacing: number;
+  radius: number;
+  hoverScale: number;
+}
+
+interface LineConfig {
+  pointSize: number;
+  lineWidth: number;
+  spacing: number;
+  hoverScale: number;
+}
+
+interface ChartConfig {
+  bar: BarConfig;
+  line: LineConfig;
+  grid: {
+    lines: number;
+    color: string;
+    darkColor: string;
+  };
+  axis: {
+    fontSize: string;
+    color: string;
+    darkColor: string;
+  };
+}
+
 const loading = ref(true);
 const userStats = ref<UserStats | null>(null);
 const applicationStats = ref<ApplicationStats | null>(null);
 const applicationTrends = ref<ApplicationTrend[]>([]);
-const selectedChartType = ref<"total" | "completed" | "pending">("total");
-const selectedChartStyle = ref<"bar" | "line">("bar");
+const selectedChartType = ref<ChartType>("total");
+const selectedChartStyle = ref<ChartStyle>("bar");
 
 // Add time range options
 const timeRangeOptions = [
@@ -289,21 +393,21 @@ const timeRangeOptions = [
   { label: "最近一個月", value: "month" },
 ];
 
-const selectedTimeRange = ref("total");
+const registrationTimeRange = ref("total");
 
 const chartTypes = [
-  { label: "總申請數", value: "total" },
-  { label: "已完成", value: "completed" },
-  { label: "處理中", value: "pending" },
+  { label: "總申請數", value: "total" as ChartType },
+  { label: "已完成", value: "completed" as ChartType },
+  { label: "處理中", value: "pending" as ChartType },
 ];
 
 const chartStyles = [
-  { label: "柱狀圖", value: "bar", icon: ChartBarIcon },
-  { label: "折線圖", value: "line", icon: ChartBarSquareIcon },
+  { label: "柱狀圖", value: "bar" as ChartStyle, icon: ChartBarIcon },
+  { label: "折線圖", value: "line" as ChartStyle, icon: ChartBarSquareIcon },
 ];
 
 // Update chart configuration
-const chartConfig = {
+const chartConfig: ChartConfig = {
   bar: {
     width: 16,
     spacing: 8,
@@ -328,27 +432,44 @@ const chartConfig = {
   },
 };
 
+// Add environment variables
+const USE_MOCK_USER_STATS = import.meta.env.VITE_USE_MOCK_USER_STATS === "true";
+const USE_MOCK_APPLICATION_STATS = import.meta.env.VITE_USE_MOCK_APPLICATION_STATS === "true";
+
+// Update widget classes to use correct mock flags
+const userStatsWidgetClass = computed(() => ({
+  'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700': !MOCK_USER_REGISTRATION,
+  'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600': MOCK_USER_REGISTRATION,
+  'relative mb-6': true
+}));
+
+const applicationStatsWidgetClass = computed(() => ({
+  'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700': !MOCK_APPLICATION_OVERVIEW,
+  'bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600': MOCK_APPLICATION_OVERVIEW,
+  'relative mb-6': true
+}));
+
 // Update userStatsDisplay computed property
-const userStatsDisplay = computed(() => {
+const userRegistrationStats = computed(() => {
   if (!userStats.value) return [];
   const stats = userStats.value;
-  const isMonthly = selectedTimeRange.value === "month";
+  const isMonthly = registrationTimeRange.value === "month";
 
   return [
     {
       label: "iAM SMART 用戶",
       value: isMonthly ? stats.monthlyIamSmartUsers : stats.iamSmartUsers,
-      icon: UserIcon,
+      icon: UserCircleIcon,
     },
     {
       label: "手機號碼用戶",
       value: isMonthly ? stats.monthlyPhoneUsers : stats.phoneUsers,
-      icon: PhoneIcon,
+      icon: DevicePhoneMobileIcon,
     },
     {
       label: "殯儀館用戶",
       value: isMonthly ? stats.monthlyUndertakerUsers : stats.undertakerUsers,
-      icon: BuildingOfficeIcon,
+      icon: UsersIcon,
     },
   ];
 });
@@ -448,45 +569,57 @@ const getLinePath = computed(() => {
   return `M ${points.join(" L ")}`;
 });
 
-const getChartStyle = (trend: { count: number }, index: number) => {
-  const { width, height, padding } = chartDimensions.value;
-  const x = padding + (index / (filteredTrends.value.length - 1)) * width;
-  const y = height + padding - (trend.count / maxTrendCount.value) * height;
+const getChartStyle = (value: number, index: number, total: number): BarStyle | PointStyle => {
+  const isBar = selectedChartStyle.value === "bar";
+  const config = isBar ? chartConfig.bar : chartConfig.line;
+  const width = isBar ? (config as BarConfig).width : (config as LineConfig).pointSize;
+  const spacing = config.spacing;
+  const totalWidth = (width + spacing) * total - spacing;
+  const left = `${(width + spacing) * index}px`;
+  const height = `${value}%`;
+  const backgroundColor = "#3b82f6";
+  const transform = "translateY(0)";
+  const transition = "all 0.2s ease-in-out";
+  const boxShadow = "0 0 0 rgba(59, 130, 246, 0)";
+  const hoverTransform = `translateY(-${config.hoverScale}px)`;
+  const hoverBoxShadow = "0 4px 6px rgba(59, 130, 246, 0.1)";
 
-  if (selectedChartStyle.value === "line") {
+  if (isBar) {
+    const barConfig = config as BarConfig;
     return {
-      position: "absolute",
-      left: `${x - chartConfig.line.pointSize / 2}px`,
-      top: `${y - chartConfig.line.pointSize / 2}px`,
-      width: `${chartConfig.line.pointSize}px`,
-      height: `${chartConfig.line.pointSize}px`,
-      borderRadius: "50%",
-      backgroundColor: getChartColor.value,
-      transform: "translate(-50%, -50%)",
-      transition: "all 0.3s ease",
-      boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-      "&:hover": {
-        transform: "translate(-50%, -50%) scale(1.2)",
-        boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+      position: 'absolute',
+      left,
+      top: `${100 - value}%`,
+      width: `${width}px`,
+      height,
+      borderRadius: `${barConfig.radius}px`,
+      backgroundColor,
+      transform,
+      transition,
+      boxShadow,
+      '&:hover': {
+        transform: hoverTransform,
+        boxShadow: hoverBoxShadow,
       },
-    };
+    } as BarStyle;
   }
 
   return {
-    position: "absolute",
-    left: `${x - chartConfig.bar.width / 2}px`,
-    bottom: `${padding}px`,
-    width: `${chartConfig.bar.width}px`,
-    height: `${(trend.count / maxTrendCount.value) * height}px`,
-    borderRadius: `${chartConfig.bar.radius}px ${chartConfig.bar.radius}px 0 0`,
-    backgroundColor: getChartColor.value,
-    transition: "all 0.3s ease",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-    "&:hover": {
-      transform: "scaleY(1.1)",
-      boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+    position: 'absolute',
+    bottom: height,
+    left,
+    width: `${width}px`,
+    height: `${width}px`,
+    borderRadius: '50%',
+    backgroundColor,
+    transform,
+    transition,
+    boxShadow,
+    '&:hover': {
+      transform: hoverTransform,
+      boxShadow: hoverBoxShadow,
     },
-  };
+  } as PointStyle;
 };
 
 // Fetch data from API
@@ -495,18 +628,20 @@ const fetchData = async () => {
     loading.value = true;
     const [
       userStatsResponse,
-      applicationStatsResponse,
-      applicationTrendsResponse,
+      applicationMetricsResponse,
     ] = await Promise.all([
       apiService.getUserStats(),
       apiService.getApplicationStats(),
-      apiService.getApplicationTrends(),
     ]);
     userStats.value = userStatsResponse;
-    applicationStats.value = applicationStatsResponse;
-    applicationTrends.value = applicationTrendsResponse;
+    applicationStats.value = applicationMetricsResponse.overview;
+    applicationTrends.value = applicationMetricsResponse.trends;
   } catch (error) {
     console.error("Error fetching dashboard data:", error);
+    // Set default values on error
+    userStats.value = null;
+    applicationStats.value = null;
+    applicationTrends.value = [];
   } finally {
     loading.value = false;
   }

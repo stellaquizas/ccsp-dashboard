@@ -2,28 +2,48 @@ const express = require("express");
 const { Pool } = require("pg");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const mockData = require("./mockData");
+const mockDataService = require("./mockData");
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-const useMockData = process.env.USE_MOCK_DATA === "true";
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL connection pool - only create if not using mock data
+// Database connection
 let pool;
-if (!useMockData) {
+// Create pool if any endpoint needs real data
+const needsRealData = 
+  process.env.MOCK_USER_REGISTRATION === "false" ||
+  process.env.MOCK_USER_ACTIVE === "false" ||
+  process.env.MOCK_USER_REGISTRATION_TREND === "false" ||
+  process.env.MOCK_USER_ACTIVITY_TREND === "false" ||
+  process.env.MOCK_APPLICATION_OVERVIEW === "false" ||
+  process.env.MOCK_APPLICATION_TRENDS === "false" ||
+  process.env.MOCK_FORM_CCABB === "false" ||
+  process.env.MOCK_FORM_CCACB === "false" ||
+  process.env.MOCK_FORM_CCBUB === "false" ||
+  process.env.MOCK_FORM_CCEXB === "false" ||
+  process.env.MOCK_FORM_CCNIB === "false" ||
+  process.env.MOCK_FORM_CCNIB_ADD === "false" ||
+  process.env.MOCK_FORM_CCNIB_REM === "false" ||
+  process.env.MOCK_FORM_CCSAB === "false" ||
+  process.env.MOCK_FORM_CCSCB === "false" ||
+  process.env.MOCK_FORM_CCTSB === "false" ||
+  process.env.MOCK_FORM_CCURB === "false";
+
+if (needsRealData) {
+  console.log("Using real database connection for some endpoints");
   pool = new Pool({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT || 5432,
+    port: process.env.DB_PORT,
   });
 
   // Test database connection
@@ -35,16 +55,49 @@ if (!useMockData) {
     }
   });
 } else {
-  console.log("Running in MOCK mode - no database connection required");
+  console.log("Using mock data - database connection skipped");
 }
 
 // API Routes
 
-// Get application metrics
+// Get application metrics (for dashboard overview)
 app.get("/api/applications/metrics", async (req, res) => {
-  if (useMockData) {
+  const { mockOverview, mockTrends } = req.query;
+
+  if (mockOverview === "true" || process.env.MOCK_APPLICATION_OVERVIEW === "true") {
     console.log("Returning mock application metrics data");
-    return res.json(mockData.applications.metrics);
+    const mockAppData = mockDataService.generateMockApplications();
+    const mockStats = mockDataService.generateMockData();
+    return res.json({
+      overview: {
+        totalApplications: mockStats.applicationStats.totalApplications,
+        pendingApplications: mockStats.applicationStats.pendingApplications,
+        completedApplications: mockStats.applicationStats.completedApplications,
+        unprocessedApplications: mockStats.applicationStats.unprocessedApplications
+      },
+      typeBreakdown: mockDataService.applicationTypes.map(type => ({
+        type: type.code,
+        name: type.name,
+        count: Math.floor(Math.random() * 100) + 1
+      })),
+      statusBreakdown: Object.entries(mockDataService.statusMapping).map(([code, info]) => ({
+        code,
+        name: info.text,
+        count: Math.floor(Math.random() * 50) + 1
+      })),
+      avgProcessingTime: mockAppData.avgProcessingTime,
+      maxProcessingTime: mockAppData.maxProcessingTime,
+      pendingOverview: {
+        over_7_days: Math.floor(Math.random() * 50),
+        over_14_days: Math.floor(Math.random() * 30)
+      },
+      trends: mockStats.applicationTrends.map(trend => ({
+        date: trend.date,
+        total: trend.total,
+        completed: trend.completed,
+        pending: trend.pending
+      }))
+    });
   }
 
   try {
@@ -204,9 +257,17 @@ app.get("/api/applications/metrics", async (req, res) => {
 
 // Get application trends
 app.get("/api/applications/trends", async (req, res) => {
-  if (useMockData) {
+  const { mock } = req.query;
+
+  if (mock === "true" || process.env.MOCK_APPLICATION_TRENDS === "true") {
     console.log("Returning mock application trends data");
-    return res.json(mockData.applications.trends);
+    const mockStats = mockDataService.generateMockData();
+    return res.json(mockStats.applicationTrends.map(trend => ({
+      date: trend.date,
+      total: trend.total,
+      completed: trend.completed,
+      pending: trend.pending
+    })));
   }
 
   try {
@@ -301,11 +362,85 @@ app.get("/api/applications/trends", async (req, res) => {
   }
 });
 
+// User statistics endpoint
+app.get("/api/user-stats", async (req, res) => {
+  const {
+    mockRegistration,
+    mockActive,
+    mockRegistrationTrend,
+    mockActivityTrend
+  } = req.query;
+
+  try {
+    // Get total users
+    const totalUsers = mockRegistration === "true" ? 
+      mockDataService.generateTotalUsers() : 
+      await pool.query(`
+        SELECT 
+          COUNT(CASE WHEN login_type = 'iamsmart' THEN 1 END) as iamsmart_users,
+          COUNT(CASE WHEN login_type = 'phone' THEN 1 END) as phone_users,
+          COUNT(CASE WHEN login_type = 'undertaker' THEN 1 END) as undertaker_users,
+          COUNT(*) as total_users
+        FROM ccsp.users;
+      `);
+
+    // Get user stats by type
+    const activeUsers = mockActive === "true" ? 
+      mockDataService.generateActiveUsers() : 
+      await pool.query(`
+        SELECT 
+          COUNT(DISTINCT CASE WHEN u.login_type = 'iamsmart' THEN l.user_id END) as monthly_iamsmart_users,
+          COUNT(DISTINCT CASE WHEN u.login_type = 'phone' THEN l.user_id END) as monthly_phone_users,
+          COUNT(DISTINCT CASE WHEN u.login_type = 'undertaker' THEN l.user_id END) as monthly_undertaker_users,
+          COUNT(DISTINCT l.user_id) as total_active_users
+        FROM ccsp.users u
+        JOIN ccsp.user_logins l ON u.id = l.user_id
+        WHERE l.login_time >= NOW() - INTERVAL '30 days';
+      `);
+
+    const registrationTrend = mockRegistrationTrend === "true" ? 
+      mockDataService.generateRegistrationTrend() :
+      await pool.query(`
+        SELECT 
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as registration_trend,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day') as daily_registrations
+        FROM ccsp.users;
+      `);
+
+    const activityTrend = mockActivityTrend === "true" ?
+      mockDataService.generateActivityTrend() :
+      await pool.query(`
+        SELECT 
+          COUNT(DISTINCT user_id) FILTER (WHERE login_time >= NOW() - INTERVAL '30 days') as activity_trend,
+          COUNT(DISTINCT user_id) FILTER (WHERE login_time >= NOW() - INTERVAL '1 day') as daily_active_users
+        FROM ccsp.user_logins;
+      `);
+
+    // Combine all stats into a single response
+    res.json({
+      ...totalUsers.rows[0],
+      ...activeUsers.rows[0],
+      ...registrationTrend.rows[0],
+      ...activityTrend.rows[0]
+    });
+  } catch (error) {
+    console.error("Error fetching user statistics:", error);
+    res.status(500).json({ error: "Failed to fetch user statistics" });
+  }
+});
+
 // Get forms
-app.get("/api/applications/forms", async (req, res) => {
-  if (useMockData) {
+app.get("/api/forms", async (req, res) => {
+  const { mock } = req.query;
+
+  if (mock === "true") {
     console.log("Returning mock forms data");
-    return res.json(mockData.applications.forms);
+    return res.json(mockDataService.applicationTypes.map(type => ({
+      id: type.code,
+      name: type.name,
+      description: `申請${type.name}`,
+      status: "active"
+    })));
   }
 
   try {
@@ -331,340 +466,17 @@ app.get("/api/applications/forms", async (req, res) => {
   }
 });
 
-// Get user activity metrics
-app.get("/api/users/metrics", async (req, res) => {
-  if (useMockData) {
-    console.log("Returning mock user metrics data");
-    return res.json(mockData.users.metrics);
-  }
-
-  try {
-    // Collect unique users from application tables
-    const userCountQuery = `
-      SELECT
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'IAM') as iamSmartUsers,
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'PHO') as phoneUsers,
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'UND') as undertakerUsers
-      FROM (
-        SELECT user_id, reg_type FROM ccsp.ccabb_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccacb_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccbub_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccexb_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_application
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_add_application
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_removals
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccsab_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccscb_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.cctsb_appl
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccurb_appl
-      ) as all_users
-    `;
-
-    const userCount = await pool.query(userCountQuery);
-
-    // Monthly user counts (last 30 days)
-    const monthlyUserCountQuery = `
-      SELECT
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'IAM') as iamSmartUsers,
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'PHO') as phoneUsers,
-        COUNT(DISTINCT user_id) FILTER (WHERE reg_type = 'UND') as undertakerUsers
-      FROM (
-        SELECT user_id, reg_type FROM ccsp.ccabb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccacb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccbub_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccexb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_application WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_add_application WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_removals WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccsab_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccscb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.cctsb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccurb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-      ) as monthly_users
-    `;
-
-    const monthlyUserCount = await pool.query(monthlyUserCountQuery);
-
-    // Daily active users (for the past 30 days)
-    const dailyActiveUsersQuery = `
-      SELECT
-        DATE(application_date) as date,
-        COUNT(DISTINCT user_id) as count
-      FROM (
-        SELECT user_id, application_date FROM ccsp.ccabb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccacb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccbub_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccexb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_application WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_add_application WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_removals WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccsab_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccscb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.cctsb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccurb_appl WHERE application_date > NOW() - INTERVAL '30 days'
-      ) as active_users
-      GROUP BY DATE(application_date)
-      ORDER BY date
-    `;
-
-    const dailyActiveUsers = await pool.query(dailyActiveUsersQuery);
-
-    // Monthly active users (by month since system launch)
-    const monthlyActiveUsersQuery = `
-      SELECT
-        TO_CHAR(application_date, 'YYYY-MM') as month,
-        COUNT(DISTINCT user_id) as count
-      FROM (
-        SELECT user_id, application_date FROM ccsp.ccabb_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccacb_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccbub_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccexb_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_application
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_add_application
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccnib_removals
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccsab_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccscb_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.cctsb_appl
-        UNION ALL
-        SELECT user_id, application_date FROM ccsp.ccurb_appl
-      ) as all_time_users
-      GROUP BY TO_CHAR(application_date, 'YYYY-MM')
-      ORDER BY month
-    `;
-
-    const monthlyActiveUsers = await pool.query(monthlyActiveUsersQuery);
-
-    // Registration trends over time - daily new registrations
-    const registrationTrendsQuery = `
-      SELECT
-        TO_CHAR(date_created, 'YYYY-MM-DD') as date,
-        COUNT(DISTINCT user_id) as count
-      FROM (
-        SELECT DISTINCT user_id, MIN(date_created) as date_created
-        FROM (
-          SELECT user_id, date_created FROM ccsp.ccabb_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccacb_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccbub_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccexb_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccnib_application
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccnib_add_application
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccnib_removals
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccsab_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccscb_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.cctsb_appl
-          UNION ALL
-          SELECT user_id, date_created FROM ccsp.ccurb_appl
-        ) as user_created_dates
-        GROUP BY user_id
-      ) as first_user_appearance
-      GROUP BY TO_CHAR(date_created, 'YYYY-MM-DD')
-      ORDER BY date
-    `;
-
-    const registrationTrends = await pool.query(registrationTrendsQuery);
-
-    // Activity breakdown by form type
-    const activityByTypeQuery = `
-      SELECT 
-        CASE 
-          WHEN origin_table LIKE '%ccabb%' THEN '流產胎安放服務'
-          WHEN origin_table LIKE '%ccacb%' THEN '其他流產物處理服務'
-          WHEN origin_table LIKE '%ccbub%' THEN '墳場埋葬服務'
-          WHEN origin_table LIKE '%ccexb%' THEN '骨殖遷移服務'
-          WHEN origin_table LIKE '%ccnib%' AND origin_table NOT LIKE '%add%' AND origin_table NOT LIKE '%rem%' THEN '骨灰龕位申請'
-          WHEN origin_table LIKE '%ccnib_add%' THEN '加放骨灰申請'
-          WHEN origin_table LIKE '%ccnib_rem%' THEN '取回骨灰申請'
-          WHEN origin_table LIKE '%ccsab%' THEN '海上撒灰服務'
-          WHEN origin_table LIKE '%ccscb%' THEN '火化服務'
-          WHEN origin_table LIKE '%cctsb%' THEN '骨灰暫存服務'
-          WHEN origin_table LIKE '%ccurb%' THEN '骨灰罐更換服務'
-          ELSE '其他服務'
-        END as type,
-        COUNT(*) as count
-      FROM (
-        SELECT 'ccabb' as origin_table FROM ccsp.ccabb_appl
-        UNION ALL
-        SELECT 'ccacb' as origin_table FROM ccsp.ccacb_appl
-        UNION ALL
-        SELECT 'ccbub' as origin_table FROM ccsp.ccbub_appl
-        UNION ALL
-        SELECT 'ccexb' as origin_table FROM ccsp.ccexb_appl
-        UNION ALL
-        SELECT 'ccnib' as origin_table FROM ccsp.ccnib_application
-        UNION ALL
-        SELECT 'ccnib_add' as origin_table FROM ccsp.ccnib_add_application
-        UNION ALL
-        SELECT 'ccnib_rem' as origin_table FROM ccsp.ccnib_removals
-        UNION ALL
-        SELECT 'ccsab' as origin_table FROM ccsp.ccsab_appl
-        UNION ALL
-        SELECT 'ccscb' as origin_table FROM ccsp.ccscb_appl
-        UNION ALL
-        SELECT 'cctsb' as origin_table FROM ccsp.cctsb_appl
-        UNION ALL
-        SELECT 'ccurb' as origin_table FROM ccsp.ccurb_appl
-      ) as application_types
-      GROUP BY type
-      ORDER BY count DESC
-    `;
-
-    const activityByType = await pool.query(activityByTypeQuery);
-
-    // Daily active users by type
-    const dailyUsersByTypeQuery = `
-      SELECT
-        reg_type,
-        COUNT(DISTINCT user_id) as count
-      FROM (
-        SELECT user_id, reg_type FROM ccsp.ccabb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccacb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccbub_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccexb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_application WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_add_application WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccnib_removals WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccsab_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccscb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.cctsb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-        UNION
-        SELECT user_id, reg_type FROM ccsp.ccurb_appl WHERE application_date > NOW() - INTERVAL '1 day'
-      ) as daily_users
-      GROUP BY reg_type
-    `;
-
-    const dailyUsersByType = await pool.query(dailyUsersByTypeQuery);
-
-    // Map daily active users by type
-    const dailyUsers = {
-      dailyIamSmartUsers: 0,
-      dailyPhoneUsers: 0,
-      dailyUndertakerUsers: 0,
-    };
-    dailyUsersByType.rows.forEach((row) => {
-      if (row.reg_type === "IAM")
-        dailyUsers.dailyIamSmartUsers = parseInt(row.count);
-      if (row.reg_type === "PHO")
-        dailyUsers.dailyPhoneUsers = parseInt(row.count);
-      if (row.reg_type === "UND")
-        dailyUsers.dailyUndertakerUsers = parseInt(row.count);
-    });
-
-    res.json({
-      iamSmartUsers: parseInt(userCount.rows[0].iamsmartusers || 0),
-      phoneUsers: parseInt(userCount.rows[0].phoneusers || 0),
-      undertakerUsers: parseInt(userCount.rows[0].undertakerusers || 0),
-      monthlyIamSmartUsers: parseInt(
-        monthlyUserCount.rows[0].iamsmartusers || 0
-      ),
-      monthlyPhoneUsers: parseInt(monthlyUserCount.rows[0].phoneusers || 0),
-      monthlyUndertakerUsers: parseInt(
-        monthlyUserCount.rows[0].undertakerusers || 0
-      ),
-      ...dailyUsers,
-      dailyActiveUsers: dailyActiveUsers.rows.map((row) => ({
-        date: row.date,
-        count: parseInt(row.count),
-      })),
-      monthlyActiveUsers: monthlyActiveUsers.rows.map((row) => ({
-        date: row.month + "-01", // Add a day to make it a valid date
-        count: parseInt(row.count),
-      })),
-      registrationTrends: registrationTrends.rows.map((row) => ({
-        date: row.date,
-        count: parseInt(row.count),
-      })),
-      activityByType: activityByType.rows.map((row) => ({
-        type: row.type,
-        count: parseInt(row.count),
-      })),
-    });
-  } catch (error) {
-    console.error("Error fetching user metrics:", error);
-
-    try {
-      // Fallback to simpler queries if the complex ones fail
-      const totalUsers = await pool.query(`
-        SELECT COUNT(DISTINCT user_sid) as count
-        FROM ccsp.ccsp_users
-      `);
-
-      res.json({
-        totalUsers: parseInt(totalUsers.rows[0].count || 0),
-      });
-    } catch (innerError) {
-      console.error("Error in fallback query:", innerError);
-      res.status(500).json({ error: "Failed to fetch user metrics" });
-    }
-  }
-});
-
 // Get applications
 app.get("/api/applications", async (req, res) => {
-  if (useMockData) {
+  const { type, mock } = req.query;
+
+  if (mock === "true" || (type && process.env[`MOCK_FORM_${type}`] === "true")) {
     console.log("Returning mock applications data");
-    return res.json(mockData.applications.list);
+    const mockAppData = mockDataService.generateMockApplications(type);
+    return res.json(mockAppData);
   }
 
   try {
-    const { type } = req.query;
-
     // Define type filter
     let typeFilter = "";
     if (type) {
@@ -1120,11 +932,13 @@ app.get("/api/applications", async (req, res) => {
   }
 });
 
-// Add this endpoint to get application types
+// Get application types
 app.get("/api/applications/types", async (req, res) => {
-  if (useMockData) {
+  const { mock } = req.query;
+
+  if (mock === "true") {
     console.log("Returning mock application types data");
-    return res.json(mockData.applications.types);
+    return res.json(mockDataService.applicationTypes);
   }
 
   try {
@@ -1153,9 +967,9 @@ app.get("/api/applications/types", async (req, res) => {
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  if (useMockData) {
-    console.log("Using MOCK data mode - dashboard will display sample data");
+  if (needsRealData) {
+    console.log("Using real database connection for some endpoints");
   } else {
-    console.log("Using real database connection");
+    console.log("Using mock data - database connection skipped");
   }
 });
